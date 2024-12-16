@@ -1,2 +1,5 @@
 # RRT-simulation
-A visual implementation of the RRT* algorithm used to calculate the shortest path from a starting to end node. (self driving)
+A visualization of the RRT* algorithm, an advanced motion planning method used in robotics and autonomous navigation. It demonstrates how the algorithm explores complex environments, avoids obstacles, and optimizes paths in real-time.
+
+Written for the Formula AI self-driving team at Cardiff University
+ 
