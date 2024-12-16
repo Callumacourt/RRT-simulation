@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+import matplotlib.patches as patches
 import math
 import random
 
@@ -38,8 +39,53 @@ class RRT_star():
         self.map_size = map_size
         self.x_bound = [0, map_size[0]]
         self.y_bound = [0, map_size[1]]
+        self.obstacles = []
+
+    def distance_to(self, x , y, targetX, targetY):
+        return math.sqrt((x - targetX) ** 2 + (y - targetY)**2)
+
+    def overlap_check(self, obstacles, x, y, radius):
         
+        # Check if new point overlaps with start or goal node
+        distance_to_start = self.distance_to(x, y, self.start[0], self.start[1])
+        distance_to_goal = self.distance_to(x, y, self.goal[0], self.goal[1])
+
+        if distance_to_start < radius or distance_to_goal < radius:
+            return True
+
+        for obs in obstacles:
+            distance_to_obs = self.distance_to(x, obs.x_center, y, obs.y_center)
+
+            if (radius + obs.radius) > distance_to_obs:
+                return True
+        return False # no overlap
+
+    def create_obstacles(self, obstacle_class, amount, radius_range):
+
+        obstacles = []
+
+        for _ in range(amount):
+            x_center = random.uniform(0, self.x_bound[1])
+            y_center = random.uniform(0, self.y_bound[1])
+            radius = random.uniform(radius_range[0], radius_range[1])
+
+            # if new obstacle overlaps with current, then start again
+            if self.overlap_check(obstacles, x_center, y_center, radius): 
+                continue
+            
+            obstacle = obstacle_class(x_center, y_center, radius)
+            obstacles.append(obstacle)
+
+        self.obstacles = obstacles
+
     def generate_point(self):
-        [newX, newY] = [random.uniform(self.x_bound), random.uniform(self.y_bound)]
-        # if new coordinate is inside an obstacle radius, retry
+        newX = random.uniform(self.x_bound[0], self.x_bound[1])
+        newY = random.uniform(self.y_bound[0], self.y_bound[1])
+
+        # Recursively try to generate a new point that isn't inside an obstacle
+        if self.overlap_check(self.obstacles, newX, newY, 0):
+            return self.generate_point()
+        
         return Node(newX, newY)
+    
+    
