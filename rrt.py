@@ -49,10 +49,11 @@ class RRT_star():
         # Check if new point overlaps with start or goal node
         distance_to_start = self.distance_to(x, y, self.start[0], self.start[1])
         distance_to_goal = self.distance_to(x, y, self.goal[0], self.goal[1])
-
+       
         if distance_to_start < radius or distance_to_goal < radius:
             return True
-
+        
+        # Check if the new point overlaps with any obstacles
         for obs in obstacles:
             distance_to_obs = self.distance_to(x, obs.x_center, y, obs.y_center)
 
@@ -87,5 +88,33 @@ class RRT_star():
             return self.generate_point()
         
         return Node(newX, newY)
+    
+    def plot(self):
+        plt.figure()
+        plt.xlim(self.x_bound)
+        plt.ylim(self.y_bound)
+
+        plt.scatter(self.start[0], self.start[1], c='green', s= 100, label= 'Start')
+        plt.scatter(self.goal[0], self.goal[1], c='red', s= 100, label = 'Goal' )
+
+        for obs in self.obstacles:
+            circle = patches.Circle(
+                (obs.x_center, obs.y_center),
+                radius = obs.radius,
+                color = 'orange'
+            )
+            plt.gca().add_patch(circle)
+
+        plt.grid()
+        plt.legend()
+        plt.gca().set_aspect('equal', adjustable='box')
+        plt.show()
+
+start = [1,1]
+goal = [9,9]
+map_size = [10,10]
+rrt = RRT_star(start, goal, map_size)
+rrt.create_obstacles(Circle, 4, [0.5, 1])
+rrt.plot()
     
     
