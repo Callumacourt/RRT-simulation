@@ -37,7 +37,8 @@ class Circle():
         vector_w = np.array([self.x_center, self.y_center]) - np.array([x1, y1]) # Start point to circle center
         # Projection result
         t = max(0, min(1, (np.dot(vector_v, vector_w) / np.dot(vector_v, vector_v))))
-
+        
+        # Determine closest point in segment to circle
         if t <= 0:
             closest_point = [x1, y1]
         elif t >= 1:
@@ -45,13 +46,15 @@ class Circle():
         elif 0 < t < 1:
             closest_point = np.array([x1, y1]) + t * vector_v
         
+        # Calculate distance to circle
         distance = math.sqrt((self.x_center - closest_point[0]) **2 + (self.y_center -  closest_point[1]) **2)
 
+        # Check if closest point is inside circle
         if distance > self.radius:
             return False
         return True
 
-        
+
 class RRT_star():
     def __init__(self, start, goal, map_size):
         self.start = start
@@ -125,11 +128,30 @@ class RRT_star():
                 smallest_distance = dist
         return nearest_node
     
-    def add_node(self, new_node):
+    def validate_node(self, new_node):
+        # Check if node is inside an obstacle
+        for obs in self.obstacles:
+            if obs.is_point_inside(new_node.x, new_node.y):
+                return None
+
+        # Find nearest node in tree    
         nearest_node = self.find_nearest_node(new_node)
+
+        for obs in self.obstacles:
+            if obs.intersect_check(nearest_node.x, nearest_node.y, new_node.x, new_node.y):
+                return None
+            
+        return nearest_node
+        
+
+    def add_node(self, new_node):
+        nearest_node = self.validate_node(new_node)
+
+        if nearest_node is None: # Node is invalud
+            return
+        
         nearest_node.children.append(new_node)
         new_node.parents.append(nearest_node)
-        
         new_node.cost = nearest_node.cost + self.distance_to(nearest_node.x, nearest_node.y, new_node.x, new_node.y)
     
     def plot(self):
