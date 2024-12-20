@@ -6,10 +6,10 @@ import math
 import random
 
 class Node():
-    def __init__(self, x, y, parent = None):
+    def __init__(self, x, y):
         self.x = x
         self.y = y
-        self.parent = parent
+        self.parents = []
         self.children = []
         self.cost = 0
 
@@ -31,11 +31,33 @@ class Circle():
     def is_point_inside(self, x, y):
         distance_to_center = math.sqrt((self.x_center - x) **2 + (self.y_center - y) **2)
         return distance_to_center <= self.radius
+    
+    def intersect_check(self, x1, y1, x2, y2):
+        vector_v = np.array([x2, y2]) - np.array([x1, y1]) # Line segment
+        vector_w = np.array([self.x_center, self.y_center]) - np.array([x1, y1]) # Start point to circle center
+        # Projection result
+        t = max(0, min(1, (np.dot(vector_v, vector_w) / np.dot(vector_v, vector_v))))
+
+        if t <= 0:
+            closest_point = [x1, y1]
+        elif t >= 1:
+            closest_point = [x2, y2]
+        elif 0 < t < 1:
+            closest_point = np.array([x1, y1]) + t * vector_v
+        
+        distance = math.sqrt((self.x_center - closest_point[0]) **2 + (self.y_center -  closest_point[1]) **2)
+
+        if distance > self.radius:
+            return False
+        return True
+
         
 class RRT_star():
     def __init__(self, start, goal, map_size):
         self.start = start
         self.goal = goal
+        self.step_size = 1
+        self.tree = []
         self.map_size = map_size
         self.x_bound = [0, map_size[0]]
         self.y_bound = [0, map_size[1]]
@@ -87,7 +109,28 @@ class RRT_star():
         if self.overlap_check(self.obstacles, newX, newY, 0):
             return self.generate_point()
         
-        return Node(newX, newY)
+        self.tree.append(Node(newX, newY))
+    
+    def find_nearest_node(self, new_node):
+        if len(self.tree) == 0:
+            return None
+        
+        nearest_node = self.tree[0]
+        smallest_distance = self.distance_to(nearest_node.x, nearest_node.y, new_node.x, new_node.y)
+
+        for node in self.tree:
+            dist = self.distance_to(node.x, node.y, new_node.x, new_node.y)
+            if dist < smallest_distance:
+                nearest_node = node
+                smallest_distance = dist
+        return nearest_node
+    
+    def add_node(self, new_node):
+        nearest_node = self.find_nearest_node(new_node)
+        nearest_node.children.append(new_node)
+        new_node.parents.append(nearest_node)
+        
+        new_node.cost = nearest_node.cost + self.distance_to(nearest_node.x, nearest_node.y, new_node.x, new_node.y)
     
     def plot(self):
         plt.figure()
