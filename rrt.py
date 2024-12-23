@@ -33,6 +33,7 @@ class Circle():
         return distance_to_center <= self.radius
     
     def intersect_check(self, x1, y1, x2, y2):
+        """Check for obstacles between two coordinates"""
         vector_v = np.array([x2, y2]) - np.array([x1, y1]) # Line segment
         vector_w = np.array([self.x_center, self.y_center]) - np.array([x1, y1]) # Start point to circle center
         # Projection result
@@ -70,7 +71,6 @@ class RRT_star():
         return math.sqrt((x - targetX) ** 2 + (y - targetY)**2)
 
     def overlap_check(self, obstacles, x, y, radius):
-        
         # Check if new point overlaps with start or goal node
         distance_to_start = self.distance_to(x, y, self.start[0], self.start[1])
         distance_to_goal = self.distance_to(x, y, self.goal[0], self.goal[1])
@@ -105,6 +105,7 @@ class RRT_star():
         self.obstacles = obstacles
 
     def generate_point(self):
+        """Generate a coordinate point in the graph and return as a node"""
         newX = random.uniform(self.x_bound[0], self.x_bound[1])
         newY = random.uniform(self.y_bound[0], self.y_bound[1])
 
@@ -115,6 +116,7 @@ class RRT_star():
         self.tree.append(Node(newX, newY))
     
     def find_nearest_node(self, new_node):
+        """Find the nearest node to a specified node"""
         if len(self.tree) == 0:
             return None
         
@@ -134,6 +136,10 @@ class RRT_star():
             if obs.is_point_inside(new_node.x, new_node.y):
                 return None
 
+        # Check node isn't outside map boundaries
+        if new_node.x > self.map_size[0] or new_node.y > self.map_size[1]:
+            return None
+
         # Find nearest node in tree    
         nearest_node = self.find_nearest_node(new_node)
 
@@ -145,6 +151,7 @@ class RRT_star():
         
 
     def add_node(self, new_node):
+        """Appending a node to the tree"""
         nearest_node = self.validate_node(new_node)
 
         if nearest_node is None: # Node is invalud
@@ -153,6 +160,32 @@ class RRT_star():
         nearest_node.children.append(new_node)
         new_node.parents.append(nearest_node)
         new_node.cost = nearest_node.cost + self.distance_to(nearest_node.x, nearest_node.y, new_node.x, new_node.y)
+
+    def steer(self, from_node, to_point):
+        """Steering the tree towards a certain node"""
+        dx = to_point.x - from_node.x
+        dy = to_point.y - from_node.y
+
+        distance = math.sqrt(dx**2 + dy**2)
+
+        if distance < self.step_size:
+            new_node = Node(to_point.x, to_point.y)
+            if self.validate_node(new_node) is not None:
+                return new_node
+            return
+    
+        dx_normalised = dx / distance
+        dy_normalised = dy / distance
+
+        new_x = from_node.x + (dx_normalised * self.step_size)
+        new_y = from_node.y + (dy_normalised * self.step_size)
+
+        new_node = Node(new_x, new_y)
+
+        if self.validate_node(new_node is not None):
+            return new_node
+        
+        
     
     def plot(self):
         plt.figure()
