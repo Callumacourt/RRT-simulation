@@ -9,7 +9,7 @@ class Node():
     def __init__(self, x, y):
         self.x = x
         self.y = y
-        self.parents = []
+        self.parent = None
         self.children = []
         self.cost = 0
 
@@ -58,10 +58,10 @@ class Circle():
 
 class RRT_star():
     def __init__(self, start, goal, map_size):
-        self.start = start
-        self.goal = goal
+        self.start = Node(start[0], start[1])
+        self.goal = Node(goal[0], goal[1])
         self.step_size = 1
-        self.tree = []
+        self.tree = [self.start]
         self.map_size = map_size
         self.x_bound = [0, map_size[0]]
         self.y_bound = [0, map_size[1]]
@@ -72,8 +72,8 @@ class RRT_star():
 
     def overlap_check(self, obstacles, x, y, radius):
         # Check if new point overlaps with start or goal node
-        distance_to_start = self.distance_to(x, y, self.start[0], self.start[1])
-        distance_to_goal = self.distance_to(x, y, self.goal[0], self.goal[1])
+        distance_to_start = self.distance_to(x, y, self.start.x, self.start.y)
+        distance_to_goal = self.distance_to(x, y, self.goal.x, self.goal.y)
        
         if distance_to_start < radius or distance_to_goal < radius:
             return True
@@ -113,7 +113,7 @@ class RRT_star():
         if self.overlap_check(self.obstacles, newX, newY, 0):
             return self.generate_point()
         
-        self.tree.append(Node(newX, newY))
+        return Node(newX, newY)
     
     def find_nearest_node(self, new_node):
         """Find the nearest node to a specified node"""
@@ -158,8 +158,9 @@ class RRT_star():
             return
         
         nearest_node.children.append(new_node)
-        new_node.parents.append(nearest_node)
+        new_node.parent = nearest_node  
         new_node.cost = nearest_node.cost + self.distance_to(nearest_node.x, nearest_node.y, new_node.x, new_node.y)
+        self.tree.append(new_node)
 
     def steer(self, from_node, to_point):
         """Steering the tree towards a certain node"""
@@ -172,7 +173,7 @@ class RRT_star():
             new_node = Node(to_point.x, to_point.y)
             if self.validate_node(new_node) is not None:
                 return new_node
-            return
+            return None
     
         dx_normalised = dx / distance
         dy_normalised = dy / distance
@@ -182,37 +183,79 @@ class RRT_star():
 
         new_node = Node(new_x, new_y)
 
-        if self.validate_node(new_node is not None):
-            return new_node
+        return new_node if self.validate_node(new_node) else None
+
         
-        
+    def rrt(self):
+        current_coordinate = self.start
+
+        while current_coordinate != self.goal:
+            random_point = self.generate_point()
+            nearest_node = self.find_nearest_node(random_point)
+            new_node = self.steer(nearest_node, random_point)
+
+            if new_node and self.validate_node(new_node):
+                self.add_node(new_node)
+                current_coordinate = new_node
+
+            if new_node and self.distance_to(current_coordinate.x, current_coordinate.y,  self.goal.x, self.goal.y) < self.step_size:
+                print('goal reached')
+                self.goal.parent = new_node
+                self.goal.cost = new_node.cost + self.distance_to(new_node.x, new_node.y, self.goal.x, self.goal.y)      
+                self.tree.append(self.goal)          
+                break
     
     def plot(self):
         plt.figure()
         plt.xlim(self.x_bound)
         plt.ylim(self.y_bound)
 
-        plt.scatter(self.start[0], self.start[1], c='green', s= 100, label= 'Start')
-        plt.scatter(self.goal[0], self.goal[1], c='red', s= 100, label = 'Goal' )
+        # Plot start and goal
+        plt.scatter(self.start.x, self.start.y, c='green', s=100, label='Start')
+        plt.scatter(self.goal.x, self.goal.y, c='red', s=100, label='Goal')
 
+        # Plot obstacles
         for obs in self.obstacles:
             circle = patches.Circle(
                 (obs.x_center, obs.y_center),
-                radius = obs.radius,
-                color = 'orange'
+                radius=obs.radius,
+                color='orange'
             )
             plt.gca().add_patch(circle)
+
+        # Plot tree edges
+        for node in self.tree:
+            for child in node.children:
+                plt.plot([node.x, child.x], [node.y, child.y], c='blue')
+
+        # Highlight the lowest-cost path to the goal
+        if self.goal.parent:
+            current = self.goal
+            while current.parent:
+                plt.plot([current.x, current.parent.x],
+                        [current.y, current.parent.y],
+                        c='green', linewidth=2)
+                current = current.parent
 
         plt.grid()
         plt.legend()
         plt.gca().set_aspect('equal', adjustable='box')
         plt.show()
 
-start = [1,1]
-goal = [9,9]
-map_size = [10,10]
+# Initialize RRT*
+start = [1, 9]
+goal = [10,10]
+map_size = [10, 10]
+
 rrt = RRT_star(start, goal, map_size)
+
+# Create obstacles
 rrt.create_obstacles(Circle, 4, [0.5, 1])
+
+# Run the RRT* algorithm
+rrt.rrt()
+
+# Plot the resulting tree and obstacles
 rrt.plot()
-    
+
     
