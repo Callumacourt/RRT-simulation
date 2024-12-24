@@ -148,7 +148,12 @@ class RRT_star():
                 return None
             
         return nearest_node
-        
+
+
+    def propogate_cost(self, node):
+        for child in node.children:
+            child.cost = node.cost + self.distance_to(node.x, node.y, child.x, child.y)
+            self.propogate_cost(child)
 
     def add_node(self, new_node):
         """Appending a node to the tree"""
@@ -161,6 +166,31 @@ class RRT_star():
         new_node.parent = nearest_node  
         new_node.cost = nearest_node.cost + self.distance_to(nearest_node.x, nearest_node.y, new_node.x, new_node.y)
         self.tree.append(new_node)
+
+    def rewire(self, new_node):
+        neighbours = self.find_neighbours(new_node)
+        nodes_rewired = 0
+        total_cost_improvement = 0
+        for neighbour in neighbours:
+            if not any(obs.intersect_check(new_node.x, new_node.y, neighbour.x, neighbour.y) for obs in self.obstacles):
+                new_cost = new_node.cost + self.distance_to(new_node.x, new_node.y, neighbour.x, neighbour.y)
+                if new_cost < neighbour.cost:
+                    nodes_rewired += 1
+                    total_cost_improvement += neighbour.cost - new_cost
+                    if neighbour.parent:
+                        neighbour.parent.children.remove(neighbour)
+                        neighbour.parent = new_node
+                        neighbour.cost = new_cost
+                        new_node.children.append(neighbour)
+                        self.propogate_cost(neighbour)
+                
+                potential_cost = neighbour.cost + self.distance_to(neighbour.x, neighbour.y, new_node.x, new_node.y)
+                if potential_cost < new_node.cost:
+                    new_node.parent.children.remove(new_node)
+                    new_node.parent = neighbour
+                    new_node.cost = potential_cost
+                    neighbour.children.append(new_node)
+                    self.propogate_cost(new_node)
 
     def steer(self, from_node, to_point):
         """Steering the tree towards a certain node"""
@@ -184,27 +214,53 @@ class RRT_star():
         new_node = Node(new_x, new_y)
 
         return new_node if self.validate_node(new_node) else None
+    
+    def find_neighbours(self, node):
 
+        scaling_factor = 20
+        n = len(self.tree)
+        dimension = 2
+
+        search_radius = scaling_factor * (math.log(n) / n) ** (1 / dimension)
+
+        neighbours = []
+
+        for other_node in self.tree:
+            if node != other_node and self.distance_to(node.x, node.y, other_node.x, other_node.y) <= search_radius:
+                neighbours.append(other_node)
+
+        return neighbours
         
-    def rrt(self):
-        current_coordinate = self.start
+    def rrt(self, max_iterations):
+        iterations = 0
+        best_cost = float('inf')  # Track the best path cost
 
-        while current_coordinate != self.goal:
+        while iterations < max_iterations:
             random_point = self.generate_point()
             nearest_node = self.find_nearest_node(random_point)
             new_node = self.steer(nearest_node, random_point)
 
             if new_node and self.validate_node(new_node):
                 self.add_node(new_node)
-                current_coordinate = new_node
+                self.rewire(new_node)
 
-            if new_node and self.distance_to(current_coordinate.x, current_coordinate.y,  self.goal.x, self.goal.y) < self.step_size:
-                print('goal reached')
-                self.goal.parent = new_node
-                self.goal.cost = new_node.cost + self.distance_to(new_node.x, new_node.y, self.goal.x, self.goal.y)      
-                self.tree.append(self.goal)          
-                break
-    
+                # Check if we can improve the path to the goal
+                distance_to_goal = self.distance_to(new_node.x, new_node.y, self.goal.x, self.goal.y)
+                if distance_to_goal < self.step_size:
+                    potential_cost = new_node.cost + distance_to_goal
+                    if potential_cost < best_cost:
+                        best_cost = potential_cost
+                        old_parent = self.goal.parent
+                        if old_parent:
+                            old_parent.children.remove(self.goal)
+                        self.goal.parent = new_node
+                        self.goal.cost = potential_cost
+                        new_node.children.append(self.goal)
+
+            iterations += 1
+        print(f'Best path cost to goal: {best_cost}')
+
+        
     def plot(self):
         plt.figure()
         plt.xlim(self.x_bound)
@@ -243,17 +299,17 @@ class RRT_star():
         plt.show()
 
 # Initialize RRT*
-start = [1, 9]
-goal = [10,10]
-map_size = [10, 10]
+start = [1, 30]
+goal = [2,2]
+map_size = [50, 50]
 
 rrt = RRT_star(start, goal, map_size)
 
 # Create obstacles
-rrt.create_obstacles(Circle, 4, [0.5, 1])
+rrt.create_obstacles(Circle, 5, [4,5 ])
 
 # Run the RRT* algorithm
-rrt.rrt()
+rrt.rrt(10000)
 
 # Plot the resulting tree and obstacles
 rrt.plot()
