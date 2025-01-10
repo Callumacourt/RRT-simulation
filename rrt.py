@@ -1,6 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
 import matplotlib.patches as patches
 import math
 import random
@@ -87,22 +86,41 @@ class RRT_star():
         return False # no overlap
 
     def create_obstacles(self, obstacle_class, amount, radius_range):
-
+        """Create obstacles"""
         obstacles = []
+        max_attempts = 20  # Retry limit for placing an obstacle
+
+        # Calculate vector along the line from start to goal
+        dx = self.goal.x - self.start.x
+        dy = self.goal.y - self.start.y
+        distance = math.sqrt(dx**2 + dy**2)
+        direction = (dx / distance, dy / distance)
 
         for _ in range(amount):
-            x_center = random.uniform(0, self.x_bound[1])
-            y_center = random.uniform(0, self.y_bound[1])
-            radius = random.uniform(radius_range[0], radius_range[1])
+            attempts = 0
+            while attempts < max_attempts:
+                # Generate a random position along the line between start and goal
+                t = random.uniform(0.2, 0.8)  # Only consider the middle portion of the line
+                x_center = self.start.x + t * dx
+                y_center = self.start.y + t * dy
 
-            # if new obstacle overlaps with current, then start again
-            if self.overlap_check(obstacles, x_center, y_center, radius): 
-                continue
-            
-            obstacle = obstacle_class(x_center, y_center, radius)
-            obstacles.append(obstacle)
+                # Add random deviation orthogonal to the line
+                deviation = random.uniform(-distance * 0.2, distance * 0.2)
+                x_center += -direction[1] * deviation  # Perpendicular direction
+                y_center += direction[0] * deviation
+
+                # Generate a random radius within the specified range
+                radius = random.uniform(radius_range[0], radius_range[1])
+
+                # Check if the obstacle placement is valid
+                if not self.overlap_check(obstacles, x_center, y_center, radius):
+                    obstacle = obstacle_class(x_center, y_center, radius)
+                    obstacles.append(obstacle)
+                    break
+                attempts += 1
 
         self.obstacles = obstacles
+
 
     def generate_point(self):
         """Generate a coordinate point in the graph and return as a node"""
@@ -172,25 +190,29 @@ class RRT_star():
         nodes_rewired = 0
         total_cost_improvement = 0
         for neighbour in neighbours:
+            # Check for obstacle between new node and the neighbour
             if not any(obs.intersect_check(new_node.x, new_node.y, neighbour.x, neighbour.y) for obs in self.obstacles):
+                # Try rewiring new_node to neighbour if it reduces the cost
                 new_cost = new_node.cost + self.distance_to(new_node.x, new_node.y, neighbour.x, neighbour.y)
                 if new_cost < neighbour.cost:
                     nodes_rewired += 1
                     total_cost_improvement += neighbour.cost - new_cost
                     if neighbour.parent:
                         neighbour.parent.children.remove(neighbour)
-                        neighbour.parent = new_node
-                        neighbour.cost = new_cost
-                        new_node.children.append(neighbour)
-                        self.propogate_cost(neighbour)
-                
+                    neighbour.parent = new_node
+                    neighbour.cost = new_cost
+                    new_node.children.append(neighbour)
+                    self.propogate_cost(neighbour)  # Cost propagation after rewiring
+
+                # Try rewiring neighbour to new_node if it reduces the cost
                 potential_cost = neighbour.cost + self.distance_to(neighbour.x, neighbour.y, new_node.x, new_node.y)
                 if potential_cost < new_node.cost:
                     new_node.parent.children.remove(new_node)
                     new_node.parent = neighbour
                     new_node.cost = potential_cost
                     neighbour.children.append(new_node)
-                    self.propogate_cost(new_node)
+                    self.propogate_cost(new_node)  # Cost propagation after rewiring
+
 
     def steer(self, from_node, to_point):
         """Steering the tree towards a certain node"""
@@ -199,7 +221,7 @@ class RRT_star():
 
         distance = math.sqrt(dx**2 + dy**2)
 
-        if distance < self.step_size:
+        if distance <= self.step_size:
             new_node = Node(to_point.x, to_point.y)
             if self.validate_node(new_node) is not None:
                 return new_node
@@ -298,20 +320,15 @@ class RRT_star():
         plt.gca().set_aspect('equal', adjustable='box')
         plt.show()
 
-# Initialize RRT*
-start = [1, 30]
-goal = [2,2]
-map_size = [50, 50]
+
+start = [1, 20]
+goal = [70, 13]
+map_size = [100, 100]
 
 rrt = RRT_star(start, goal, map_size)
 
-# Create obstacles
-rrt.create_obstacles(Circle, 5, [4,5 ])
+rrt.create_obstacles(Circle, 8, [4,5 ])
 
-# Run the RRT* algorithm
-rrt.rrt(10000)
+rrt.rrt(7000)
 
-# Plot the resulting tree and obstacles
 rrt.plot()
-
-    
